@@ -1,0 +1,12 @@
+{
+  "name": "zaomeng-license-admin",
+  "version": "1.0.0",
+  "description": "Card-key (activation code) licensing admin backend for browser extensions — Netlify Functions + Blobs",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^7.0.0"
+  }
+}

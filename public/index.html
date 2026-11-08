@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>造梦2.0 · 卡密管理后台</title>
+<style>
+:root{--bg:#0f1216;--panel:#171c22;--panel2:#1e252d;--line:#2a333d;--txt:#e6edf3;--dim:#8b98a5;--accent:#3b82f6;--ok:#22c55e;--bad:#ef4444;--radius:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei UI",sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:var(--panel2);padding:7px 14px;border-radius:8px;cursor:pointer;transition:.15s}
+button:hover:not(:disabled){background:#2a333d}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{background:#3a1d1d;border-color:#5a2a2a;color:#ff8b8b}
+input,select{background:#0d1116;border:1px solid var(--line);border-radius:8px;padding:8px 11px;outline:none;width:100%}
+input:focus,select:focus{border-color:var(--accent)}
+.hide{display:none!important}
+#login{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-card{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.login-card h1{font-size:20px;margin-bottom:6px}
+.login-card p{color:var(--dim);font-size:13px;margin-bottom:22px}
+.login-card button{width:100%;margin-top:14px;padding:11px}
+.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px}
+#app{max-width:1100px;margin:0 auto;padding:24px 20px 60px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+header h1{font-size:19px;display:flex;align-items:center;gap:9px}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;background:#1e3a5f;color:#7db8ff;border:1px solid #2a4a70}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+.card h2{font-size:15px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.field label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center}
+.hint{font-size:12px;color:var(--dim);margin-left:auto}
+.gen-item{display:flex;align-items:center;gap:10px;padding:8px 11px;background:#0d1116;border:1px solid var(--line);border-radius:8px;margin-bottom:7px}
+.gen-item code{flex:1;font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#7dd3fc;word-break:break-all}
+.gen-item small{color:var(--dim);font-size:11.5px;white-space:nowrap}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);max-height:460px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:880px}
+th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--panel2);font-weight:600;font-size:12px;color:var(--dim);position:sticky;top:0;z-index:1}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#1b2229}
+td code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7dd3fc}
+.tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.tag.ok{background:#12331f;color:#4ade80;border:1px solid #1c5a33}
+.tag.exp{background:#331a1a;color:#f87171;border:1px solid #5a2626}
+.tag.perm{background:#1e2f4a;color:#93c5fd;border:1px solid #2a4a70}
+td button{padding:3px 9px;font-size:12px;border-radius:6px;margin-right:4px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1e252d;border:1px solid var(--line);padding:11px 22px;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);opacity:0;transition:.25s;pointer-events:none;z-index:99;font-size:13px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-card">
+    <h1>造梦2.0 卡密后台</h1>
+    <p>输入密码生成卡密</p>
+    <input id="pwd" type="password" placeholder="密码" autocomplete="current-password">
+    <button class="primary" id="loginBtn">登录</button>
+    <div class="err" id="loginErr"></div>
+    <p style="margin-top:18px;font-size:11px;color:#6a7166;line-height:1.6">
+      卡密由服务器签发，前端无法伪造。<br>
+      密码连续输错会被临时限制。
+    </p>
+  </div>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <h1>造梦2.0 卡密后台 <span class="badge">服务端签发版</span></h1>
+    <button id="logoutBtn">退出</button>
+  </header>
+
+  <div class="card">
+    <h2>生成卡密</h2>
+    <div class="grid">
+      <div class="field">
+        <label>有效期类型</label>
+        <select id="unit">
+          <option value="minute">自定义分钟</option>
+          <option value="hour">自定义小时</option>
+          <option value="day" selected>自定义天数</option>
+          <option value="month">月卡（30天/月）</option>
+          <option value="forever">永久卡</option>
+        </select>
+      </div>
+      <div class="field" id="amountField">
+        <label>时长数值</label>
+        <input id="amount" type="number" value="30" min="1" max="100000">
+      </div>
+      <div class="field">
+        <label>生成数量</label>
+        <input id="count" type="number" value="1" min="1" max="200">
+      </div>
+      <div class="field">
+        <label>卡密类型</label>
+        <input id="ctype" type="text" value="通用" readonly title="所有卡密功能相同，只有时效不同">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="genBtn">生成卡密</button>
+      <button id="copyAllBtn" class="hide">复制全部</button>
+      <span class="hint" id="genHint"></span>
+    </div>
+    <div id="genResult" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <h2>卡密记录 <span class="badge" id="histCount">0</span></h2>
+    <div class="actions" style="margin:0 0 12px">
+      <input id="histSearch" type="search" placeholder="搜索卡密" style="max-width:260px">
+      <select id="histFilter" style="max-width:150px">
+        <option value="all">全部</option>
+        <option value="ok">有效</option>
+        <option value="exp">已过期</option>
+        <option value="perm">永久卡</option>
+        <option value="act">已激活</option>
+      </select>
+      <button id="syncBtn">同步服务器状态</button>
+      <button id="exportBtn">导出 CSV</button>
+      <button id="exportTxtBtn">导出 TXT</button>
+      <button id="trashBtn" onclick="showTrash()">回收站</button>
+      <button class="danger" id="clearHistBtn">清空本地记录</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>卡密</th><th>有效期</th><th>激活时间</th><th>到期时间</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:12px;color:#6a7166;margin-top:10px">
+      记录存在本机浏览器里，换电脑或清缓存会丢。重要卡密请点「导出 CSV」备份。<br>
+      删除的卡密会进「回收站」，保留 90 天可恢复。
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const API = "/api";
+const SESSION_KEY = "zm_admin_session";
+const HIST_KEY = "zm_card_history_v1";
+
+let sessionToken = sessionStorage.getItem(SESSION_KEY) || "";
+let lastBatch = [];
+
+/* ---------- 工具 ---------- */
+function toast(msg, ms = 2200) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), ms);
+}
+async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (sessionToken) headers.Authorization = "Bearer " + sessionToken;
+  const res = await fetch(API + path, { ...options, headers: { ...headers, ...(options.headers || {}) } });
+  let data = {};
+  try { data = await res.json(); } catch (_) {}
+  if (res.status === 401 && path !== "/admin/login") {
+    logout();
+    throw new Error("会话已过期，请重新登录");
+  }
+  return data;
+}
+const UNIT_NAME = { minute: "分钟", hour: "小时", day: "天", month: "月", forever: "永久" };
+function unitLabel(unit, amount) {
+  if (unit === "forever") return "永久";
+  return amount + " " + (UNIT_NAME[unit] || unit);
+}
+function fmtTime(iso) {
+  if (!iso) return "永久有效";
+  return new Date(iso).toLocaleString("zh-CN");
+}
+
+/* ---------- 登录 ---------- */
+async function login() {
+  const pwd = $("pwd").value;
+  if (!pwd) { $("loginErr").textContent = "请输入密码"; return; }
+  $("loginBtn").disabled = true;
+  $("loginErr").textContent = "";
+  try {
+    const d = await api("/admin/login", { method: "POST", body: JSON.stringify({ password: pwd }) });
+    if (!d.ok) { $("loginErr").textContent = d.message || "登录失败"; return; }
+    sessionToken = d.token;
+    sessionStorage.setItem(SESSION_KEY, sessionToken);
+    $("pwd").value = "";
+    showApp();
+  } catch (e) {
+    $("loginErr").textContent = e.message;
+  } finally {
+    $("loginBtn").disabled = false;
+  }
+}
+function logout() {
+  sessionToken = "";
+  sessionStorage.removeItem(SESSION_KEY);
+  $("app").classList.add("hide");
+  $("login").classList.remove("hide");
+}
+function showApp() {
+  $("login").classList.add("hide");
+  $("app").classList.remove("hide");
+  renderHistory();
+  // 进后台自动同步一次
+  setTimeout(() => { syncServer(true); }, 300);
+  // 每 30 秒自动同步
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+  autoSyncTimer = setInterval(() => { syncServer(true); }, 30000);
+}
+
+let autoSyncTimer = null;
+
+/* ---------- 生成 ---------- */
+function syncAmountField() {
+  const forever = $("unit").value === "forever";
+  $("amountField").style.opacity = forever ? ".35" : "1";
+  $("amount").disabled = forever;
+  const def = { minute: 30, hour: 12, day: 30, month: 1, forever: 0 }[$("unit").value];
+  $("amount").value = def;
+}
+async function generate() {
+  const unit = $("unit").value;
+  const amount = Number($("amount").value || 0);
+  const count = Math.min(Number($("count").value || 1), 200);
+  const type = "通用";   // 所有卡密功能相同，只有时效不同
+  $("genBtn").disabled = true;
+  try {
+    const d = await api("/admin/create", {
+      method: "POST",
+      body: JSON.stringify({ unit, amount, count, type })
+    });
+    if (!d.ok) { toast(d.message || "生成失败"); return; }
+    lastBatch = d.created;
+    $("genResult").innerHTML = d.created.map(c => `
+      <div class="gen-item">
+        <code>${c.card}</code>
+        <small>${c.permanent ? "永久" : fmtTime(c.expiresAt)}</small>
+        <button onclick="copyOne('${c.card}')">复制</button>
+      </div>`).join("");
+    $("copyAllBtn").classList.remove("hide");
+    addHistory(d.created, { type, unit, amount });
+    toast("已生成 " + d.created.length + " 张（激活后才开始计时）");
+  } catch (e) {
+    toast("生成失败：" + e.message);
+  } finally {
+    $("genBtn").disabled = false;
+  }
+}
+function copyOne(card) {
+  navigator.clipboard.writeText(card).then(() => toast("已复制"), () => toast("复制失败"));
+}
+function copyAll() {
+  navigator.clipboard.writeText(lastBatch.map(c => c.card).join("\n")).then(
+    () => toast("已复制 " + lastBatch.length + " 张"),
+    () => toast("复制失败")
+  );
+}
+
+/* ---------- 历史记录 ---------- */
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); } catch (_) { return []; }
+}
+function saveHistory(list) {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, 5000))); } catch (_) {}
+}
+function addHistory(cards, meta) {
+  const list = loadHistory();
+  const now = Date.now();
+  for (const c of cards) {
+    list.unshift({
+      card: c.card, type: meta.type, unit: meta.unit, amount: meta.amount,
+      exp: c.expiresAt ? new Date(c.expiresAt).getTime() : 0, createdAt: now
+    });
+  }
+  saveHistory(list);
+  renderHistory();
+}
+function renderHistory() {
+  const list = loadHistory();
+  const q = ($("histSearch")?.value || "").trim().toLowerCase();
+  const f = $("histFilter")?.value || "all";
+  const now = Date.now();
+
+  const filtered = list.filter((r) => {
+    if (q && !(r.card.toLowerCase().includes(q) || (r.type || "").toLowerCase().includes(q))) return false;
+    const srv = serverState[r.card];
+    const expired = srv ? (srv.expiresAt !== 0 && srv.expiresAt && now > srv.expiresAt) : false;
+    if (f === "ok" && expired) return false;
+    if (f === "exp" && !expired) return false;
+    if (f === "perm" && !(srv && srv.expiresAt === 0)) return false;
+    if (f === "act" && !srv) return false;
+    return true;
+  });
+
+  const total = list.length;
+  $("histCount").textContent = filtered.length === total ? total : filtered.length + "/" + total;
+
+  if (!filtered.length) {
+    $("histBody").innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8b98a5;padding:24px">还没有生成过卡密</td></tr>';
+    return;
+  }
+
+  $("histBody").innerHTML = filtered.map((r) => {
+    const srv = serverState[r.card];
+    let tag, expText, actText;
+
+    if (!srv) {
+      tag = '<span class="tag" style="background:#2a2a2a;color:#8b98a5;border:1px solid #3a3a3a">未激活</span>';
+      expText = "激活后开始计时";
+      actText = "—";
+    } else if (srv.deleted) {
+      tag = '<span class="tag exp">已删除</span>';
+      expText = "—";
+      actText = srv.activatedAt ? new Date(srv.activatedAt).toLocaleString("zh-CN") : "—";
+    } else if (srv.disabled) {
+      tag = '<span class="tag exp">已禁用</span>';
+      expText = srv.expiresAt === 0 ? "永久" : (srv.expiresAt ? new Date(srv.expiresAt).toLocaleString("zh-CN") : "—");
+      actText = srv.activatedAt ? new Date(srv.activatedAt).toLocaleString("zh-CN") : "—";
+    } else if (srv.expiresAt === 0) {
+      tag = '<span class="tag perm">永久</span>';
+      expText = "永久有效";
+      actText = srv.activatedAt ? new Date(srv.activatedAt).toLocaleString("zh-CN") : "—";
+    } else if (srv.expiresAt && now > srv.expiresAt) {
+      tag = '<span class="tag exp">已过期</span>';
+      expText = new Date(srv.expiresAt).toLocaleString("zh-CN");
+      actText = srv.activatedAt ? new Date(srv.activatedAt).toLocaleString("zh-CN") : "—";
+    } else {
+      tag = '<span class="tag ok">有效</span>';
+      expText = srv.expiresAt ? new Date(srv.expiresAt).toLocaleString("zh-CN") : "—";
+      actText = srv.activatedAt ? new Date(srv.activatedAt).toLocaleString("zh-CN") : "—";
+    }
+
+    return `<tr>
+      <td><code>${r.card}</code></td>
+      <td>${unitLabel(r.unit, r.amount)}</td>
+      <td>${actText}</td>
+      <td>${expText}</td>
+      <td>${tag}</td>
+      <td>
+        <button onclick="copyOne('${r.card}')">复制</button>
+        <button onclick="renewCard('${r.card}')">续费</button>
+        <button onclick="toggleDisable('${r.card}', ${srv && srv.disabled ? "true" : "false"})">${srv && srv.disabled ? "启用" : "禁用"}</button>
+        <button onclick="unbindCard('${r.card}')">解绑</button>
+        <button class="danger" onclick="deleteCard('${r.card}')">删除</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---------- 服务端状态缓存 ---------- */
+let serverState = {};
+
+async function syncServer(silent) {
+  const list = loadHistory();
+  if (!list.length) {
+    if (!silent) toast("没有记录可同步");
+    return;
+  }
+  try {
+    const cards = list.map(r => r.card);
+    const d = await api("/admin/status", { method: "POST", body: JSON.stringify({ cards }) });
+    if (!d.ok) {
+      if (!silent) toast(d.message || "同步失败");
+      return;
+    }
+    serverState = {};
+    for (const item of d.list) {
+      if (item.record) serverState[item.card] = item.record;
+    }
+    renderHistory();
+    if (!silent) {
+      const activated = Object.keys(serverState).length;
+      toast("已同步 " + activated + " 张已激活卡密");
+    }
+  } catch (e) {
+    if (!silent) toast("同步失败：" + e.message);
+  }
+}
+
+/* ---------- 续费 ---------- */
+async function renewCard(card) {
+  const unitName = prompt("续费单位：minute（分钟）/ hour（小时）/ day（天）/ month（月）/ forever（永久）", "day");
+  if (!unitName) return;
+  if (!["minute","hour","day","month","forever"].includes(unitName)) {
+    return toast("单位不正确");
+  }
+  const amount = unitName === "forever" ? 0 : Number(prompt("续费数值", "30"));
+  if (unitName !== "forever" && (!amount || amount <= 0)) return toast("数值不正确");
+
+  try {
+    const d = await api("/admin/renew", { method: "POST", body: JSON.stringify({ card, unit: unitName, amount }) });
+    if (!d.ok) return toast(d.message || "续费失败");
+    toast(d.permanent ? "已设为永久" : "已续费至 " + new Date(d.expiresAt).toLocaleString("zh-CN"));
+    await syncServer();
+  } catch (e) {
+    toast("续费失败：" + e.message);
+  }
+}
+
+/* ---------- 禁用/启用 ---------- */
+async function toggleDisable(card, isDisabled) {
+  try {
+    const d = await api(isDisabled ? "/admin/enable" : "/admin/disable", { method: "POST", body: JSON.stringify({ card }) });
+    if (!d.ok) return toast(d.message || "操作失败");
+    toast(isDisabled ? "已启用" : "已禁用");
+    await syncServer();
+  } catch (e) {
+    toast("操作失败：" + e.message);
+  }
+}
+
+/* ---------- 解绑 ---------- */
+async function unbindCard(card) {
+  if (!confirm("确定解绑这张卡密的设备？\n解绑后可以在新电脑上激活。")) return;
+  try {
+    const d = await api("/admin/unbind", { method: "POST", body: JSON.stringify({ card }) });
+    if (!d.ok) return toast(d.message || "解绑失败");
+    toast("已解绑");
+    await syncServer();
+  } catch (e) {
+    toast("解绑失败：" + e.message);
+  }
+}
+
+/* ---------- 删除 ---------- */
+async function deleteCard(card) {
+  if (!confirm("确定删除这张卡密？\n\n· 客户立即无法使用\n· 记录会进回收站，90 天内可恢复")) return;
+  try {
+    const d = await api("/admin/delete", { method: "POST", body: JSON.stringify({ card }) });
+    if (!d.ok) return toast(d.message || "删除失败");
+    // 从本地历史里移除
+    const list = loadHistory().filter((r) => r.card !== card);
+    saveHistory(list);
+    delete serverState[card];
+    renderHistory();
+    toast("已删除（可在回收站恢复）");
+    // 后台静默同步一次，确保状态一致
+    syncServer(true);
+  } catch (e) {
+    toast("删除失败：" + e.message);
+  }
+}
+
+/* ---------- 回收站 ---------- */
+async function showTrash() {
+  try {
+    const d = await api("/admin/trash");
+    if (!d.ok) return toast(d.message || "读取回收站失败");
+    if (!d.items.length) return toast("回收站是空的");
+    const lines = d.items.map((x) => {
+      const t = new Date(x.deletedAt).toLocaleString("zh-CN");
+      return x.card + "  (" + t + ")";
+    });
+    const input = prompt(
+      "回收站（最近 90 天，共 " + d.total + " 张）：\n\n" +
+      lines.join("\n") +
+      "\n\n输入要恢复的卡密（留空取消）："
+    );
+    if (!input) return;
+    const card = input.trim().toUpperCase();
+    const r = await api("/admin/restore", { method: "POST", body: JSON.stringify({ card }) });
+    if (!r.ok) return toast(r.message || "恢复失败");
+    // 恢复到本地历史
+    const list = loadHistory();
+    if (!list.some((x) => x.card === card)) {
+      list.unshift({ card, type: "恢复", unit: "day", amount: 0, exp: 0, createdAt: Date.now() });
+      saveHistory(list);
+    }
+    toast("已恢复 " + card);
+    await syncServer(true);
+  } catch (e) {
+    toast("回收站操作失败：" + e.message);
+  }
+}
+
+/* ---------- 导出 ---------- */
+function exportCsv() {
+  const list = loadHistory();
+  if (!list.length) return toast("没有记录可导出");
+  const now = Date.now();
+  const rows = [["卡密", "类型", "有效期", "到期时间", "状态", "生成时间"]];
+  for (const r of list) {
+    const expired = r.exp && now > r.exp;
+    rows.push([
+      r.card, r.type || "", unitLabel(r.unit, r.amount),
+      r.exp ? new Date(r.exp).toLocaleString("zh-CN") : "永久有效",
+      r.exp === 0 ? "永久" : expired ? "已过期" : "有效",
+      r.createdAt ? new Date(r.createdAt).toLocaleString("zh-CN") : ""
+    ]);
+  }
+  const csv = "\uFEFF" + rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
+  download("卡密记录_" + new Date().toISOString().slice(0,10) + ".csv", csv, "text/csv;charset=utf-8");
+  toast("已导出 " + list.length + " 条");
+}
+function exportTxt() {
+  const list = loadHistory();
+  if (!list.length) return toast("没有记录可导出");
+  const now = Date.now();
+  let txt = "造梦2.0 卡密记录\n导出时间：" + new Date().toLocaleString("zh-CN") + "\n共 " + list.length + " 张\n\n";
+  for (const r of list) {
+    const expired = r.exp && now > r.exp;
+    txt += r.card + "\n";
+    txt += "  类型：" + (r.type || "—") + " | 有效期：" + unitLabel(r.unit, r.amount) + "\n";
+    txt += "  到期：" + (r.exp ? new Date(r.exp).toLocaleString("zh-CN") : "永久有效") + "\n\n";
+  }
+  download("卡密记录_" + new Date().toISOString().slice(0,10) + ".txt", txt, "text/plain;charset=utf-8");
+  toast("已导出 " + list.length + " 条");
+}
+function download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+function clearHistory() {
+  if (!confirm("确定清空所有卡密记录？\n清空后无法恢复，建议先导出备份。")) return;
+  localStorage.removeItem(HIST_KEY);
+  renderHistory();
+  toast("已清空记录");
+}
+
+/* ---------- 事件 ---------- */
+$("loginBtn").addEventListener("click", login);
+$("pwd").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+$("logoutBtn").addEventListener("click", logout);
+$("unit").addEventListener("change", syncAmountField);
+$("genBtn").addEventListener("click", generate);
+$("copyAllBtn").addEventListener("click", copyAll);
+$("syncBtn").addEventListener("click", syncServer);
+$("exportBtn").addEventListener("click", exportCsv);
+$("exportTxtBtn").addEventListener("click", exportTxt);
+$("clearHistBtn").addEventListener("click", clearHistory);
+$("histSearch").addEventListener("input", renderHistory);
+$("histFilter").addEventListener("change", renderHistory);
+
+syncAmountField();
+if (sessionToken) {
+  api("/admin/create", { method: "POST", body: JSON.stringify({ unit: "day", amount: 0, count: 0, type: "x" }) })
+    .then(d => { if (d.ok || d.message) showApp(); else logout(); })
+    .catch(() => logout());
+}
+</script>
+</body>
+</html>
